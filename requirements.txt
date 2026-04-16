@@ -1,0 +1,3 @@
+# Azure Oryx / App Service runs `pip install -r requirements.txt` from repo root.
+# Delegate to the FastAPI app under /backend.
+-r backend/requirements.txt
