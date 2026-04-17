@@ -1,5 +1,8 @@
 name: Deploy to Azure Web App
 
+# Publish profile only (no azure/login — avoids "No subscriptions found").
+# Edit `app-name` below if your Azure Web App name differs (e.g. libra-api-xyz).
+
 on:
   push:
     branches: [main]
@@ -7,6 +10,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: azure-deploy-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-and-deploy:
