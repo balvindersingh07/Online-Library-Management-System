@@ -1,7 +1,7 @@
 name: Deploy to Azure Web App
 
 # Publish profile only (no azure/login — avoids "No subscriptions found").
-# Edit `app-name` below if your Azure Web App name differs (e.g. libra-api-xyz).
+# app-name matches Azure Web App `libra-api-UNIQUE` (edit if you rename the app).
 
 on:
   push:
@@ -23,7 +23,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: '3.11'
           cache: pip
           cache-dependency-path: requirements.txt
 
@@ -37,7 +37,7 @@ jobs:
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: libra-api
+          app-name: libra-api-UNIQUE
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: .
           clean: true
