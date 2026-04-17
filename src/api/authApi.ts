@@ -1,6 +1,5 @@
 import { apiFetch, setAccessToken } from './client'
 import type { User } from '../types'
-import { API_BASE_URL } from './config'
 
 export type TokenResponse = {
   access_token: string
@@ -66,6 +65,4 @@ export function logoutRequest(): void {
   setAccessToken(null)
 }
 
-export function isApiEnabled(): boolean {
-  return Boolean(API_BASE_URL)
-}
+export { isApiEnabled } from './config'

@@ -13,7 +13,7 @@ import {
 } from './auth.js'
 import { uploadBytes } from './blob.js'
 import { openApiSpec } from './openapi.js'
-import { seedIfEmpty } from './seed.js'
+import { seedIfEmpty, seedDevAdminIfMissing } from './seed.js'
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -307,6 +307,7 @@ app.post(
 
 getDb()
 seedIfEmpty()
+seedDevAdminIfMissing()
 const port = Number(process.env.PORT || process.env.WEBSITES_PORT || 8000)
 app.listen(port, '0.0.0.0', () => {
   console.log(`[libra-api] listening on 0.0.0.0:${port}`)

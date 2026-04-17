@@ -26,8 +26,8 @@ function dispatchAuthChanged() {
 type AuthContextValue = {
   user: User | null
   loading: boolean
-  login: (email: string, password: string) => Promise<void>
-  register: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<User>
+  register: (email: string, password: string) => Promise<User>
   logout: () => void
 }
 
@@ -96,11 +96,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const u = await loginRequest(email, password)
         persist(u)
         dispatchAuthChanged()
-        return
+        return u
       }
       const name =
         (email.split('@')[0] || 'reader').replace(/^./, (c) => c.toUpperCase())
-      persist({ id: 'u1', email, name })
+      const u: User = { id: 'u1', email, name, role: 'user' }
+      persist(u)
+      return u
     },
     [api, persist],
   )
@@ -111,11 +113,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const u = await registerRequest(email, password)
         persist(u)
         dispatchAuthChanged()
-        return
+        return u
       }
-      await login(email, password)
+      return login(email, password)
     },
-    [api, login, persist],
+    [api, login],
   )
 
   const logout = useCallback(() => {

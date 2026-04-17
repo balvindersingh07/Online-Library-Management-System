@@ -1,4 +1,5 @@
 import { getDb } from './db.js'
+import { hashPassword } from './auth.js'
 
 /** Same catalog as `src/data/mockBooks.ts` (IDs assigned by SQLite). */
 const DEMO_BOOKS = [
@@ -27,4 +28,65 @@ export function seedIfEmpty() {
     ins.run(...row)
   }
   console.log(`[libra-api] seeded ${DEMO_BOOKS.length} demo books (empty catalog)`)
+}
+
+/**
+ * Creates a dev admin if missing (local / non-production by default).
+ * Set SEED_DEV_ADMIN=0 to disable, or SEED_DEV_ADMIN=1 on production for first boot only.
+ */
+export function seedDevAdminIfMissing() {
+  const disabled =
+    process.env.SEED_DEV_ADMIN === '0' || process.env.SEED_DEV_ADMIN === 'false'
+  if (disabled) return
+
+  const enabledExplicit =
+    process.env.SEED_DEV_ADMIN === '1' || process.env.SEED_DEV_ADMIN === 'true'
+  const isProd = process.env.NODE_ENV === 'production'
+  if (isProd && !enabledExplicit) return
+
+  const email = String(process.env.DEV_ADMIN_EMAIL || 'admin@libra.local')
+    .toLowerCase()
+    .trim()
+  const password = String(process.env.DEV_ADMIN_PASSWORD || 'LibraAdmin123!')
+  const hash = hashPassword(password)
+
+  const db = getDb()
+  const row = db
+    .prepare('SELECT id, role FROM users WHERE email = ?')
+    .get(email)
+
+  const allowRepair = enabledExplicit || !isProd
+
+  if (!row) {
+    db.prepare(
+      'INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)',
+    ).run(email, hash, 'admin')
+    console.log(
+      `[libra-api] seeded dev admin user ${email} (set SEED_DEV_ADMIN=0 after first login; change password in production)`,
+    )
+    return
+  }
+
+  if (!allowRepair) return
+
+  if (row.role === 'admin') {
+    const resync =
+      process.env.DEV_ADMIN_RESYNC === '1' ||
+      process.env.DEV_ADMIN_RESYNC === 'true'
+    if (resync) {
+      db.prepare('UPDATE users SET password_hash = ? WHERE email = ?').run(
+        hash,
+        email,
+      )
+      console.log(`[libra-api] resynced dev admin password for ${email}`)
+    }
+    return
+  }
+
+  db.prepare(
+    'UPDATE users SET role = ?, password_hash = ? WHERE email = ?',
+  ).run('admin', hash, email)
+  console.log(
+    `[libra-api] dev admin ${email}: promoted from "${row.role}" to admin and set dev password (was blocking staff login after reader signup)`,
+  )
 }

@@ -4,12 +4,14 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { LibraryProvider } from './context/LibraryContext'
 import { AppShell } from './components/layout/AppShell'
 import { LoginPage } from './pages/LoginPage'
+import { AdminLoginPage } from './pages/AdminLoginPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { CatalogPage } from './pages/CatalogPage'
 import { BookDetailsPage } from './pages/BookDetailsPage'
 import { AccountPage } from './pages/AccountPage'
 import { AdminPage } from './pages/AdminPage'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
+import { AdminRoute } from './components/auth/AdminRoute'
 
 function HomeRoute() {
   const { user, loading } = useAuth()
@@ -32,6 +34,7 @@ export default function App() {
           <LibraryProvider>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/admin/login" element={<AdminLoginPage />} />
               <Route element={<AppShell />}>
                 <Route path="/" element={<HomeRoute />} />
                 <Route path="/catalog" element={<CatalogPage />} />
@@ -47,9 +50,9 @@ export default function App() {
                 <Route
                   path="/admin"
                   element={
-                    <ProtectedRoute>
+                    <AdminRoute>
                       <AdminPage />
-                    </ProtectedRoute>
+                    </AdminRoute>
                   }
                 />
               </Route>

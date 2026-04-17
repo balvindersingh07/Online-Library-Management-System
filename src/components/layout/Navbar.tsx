@@ -51,9 +51,11 @@ export function Navbar() {
           <NavLink to="/account" className={linkClass}>
             My Account
           </NavLink>
-          <NavLink to="/admin" className={linkClass}>
-            Admin
-          </NavLink>
+          {user?.role === 'admin' ? (
+            <NavLink to="/admin" className={linkClass}>
+              Admin
+            </NavLink>
+          ) : null}
         </nav>
 
         <div className="flex items-center gap-2">
@@ -105,9 +107,11 @@ export function Navbar() {
         <NavLink to="/account" className={linkClass}>
           Account
         </NavLink>
-        <NavLink to="/admin" className={linkClass}>
-          Admin
-        </NavLink>
+        {user?.role === 'admin' ? (
+          <NavLink to="/admin" className={linkClass}>
+            Admin
+          </NavLink>
+        ) : null}
       </nav>
     </header>
   )

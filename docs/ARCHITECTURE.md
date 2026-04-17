@@ -1,39 +1,67 @@
 # Online Library Management System — Azure Architecture
 
-## High-level architecture diagram
+## Diagram 1 — Assignment target (recommended production shape)
 
 ```mermaid
 flowchart TB
     subgraph Users["Users"]
-        Browser["Web browser\n(React SPA)"]
+        Browser["Web browser\n(React SPA / static site)"]
     end
 
-    subgraph Azure["Azure cloud"]
-        subgraph Compute["Compute"]
-            AppService["Azure App Service\n(Node.js / Express API)"]
+    subgraph Azure["Azure"]
+        subgraph Compute["Azure App Service"]
+            WebApp["Web App\nNode.js 20 LTS\nExpress REST API"]
         end
 
-        subgraph Data["Data & files"]
-            SQL["SQLite on App Service\n(/tmp) or Azure SQL if migrated"]
-            Blob["Azure Blob Storage\ncontainer: book-covers"]
+        subgraph Data["Data plane"]
+            SQLDB[("Azure SQL Database\nusers · books · borrows")]
+            Blob["Azure Blob Storage\ncontainer: book-covers\n(Hot / LRS)"]
         end
     end
 
-    Browser -->|"HTTPS\nREST + JSON"| AppService
-    AppService -->|"better-sqlite3 / future SQL"| SQL
-    AppService -->|"@azure/storage-blob"| Blob
-    Browser -.->|"VITE_API_BASE_URL"| AppService
+    Browser -->|"HTTPS\nREST + JSON"| WebApp
+    WebApp -->|"TLS, SQL auth\nor Entra / managed identity"| SQLDB
+    WebApp -->|"SDK: @azure/storage-blob\nSAS or account key via app settings"| Blob
+    Browser -.->|"VITE_API_BASE_URL\n(CORS allowlist)"| WebApp
 ```
 
-## What each part does
+| Component | Responsibility |
+|-----------|----------------|
+| **Azure App Service** | Runs the Node/Express API (`npm start`), JWT auth, business logic, Swagger at `/docs`. |
+| **Azure SQL Database** | Relational store for users, books, borrow rows; backups per SQL SKU. |
+| **Azure Blob Storage** | Book cover images; URLs persisted in the database. |
 
-| Component | Role |
-|-----------|------|
-| **Web browser** | React UI: login, catalog, borrow/return, admin. |
-| **Azure App Service** | Hosts Express API: `/auth`, `/books`, `/borrow`, `/return`, `/me/borrows`, `/upload`, `/docs` (Swagger UI). |
-| **SQLite** | Default embedded DB (`/tmp/library.db` on Azure). |
-| **Azure Blob** | Optional cover uploads via `AZURE_STORAGE_CONNECTION_STRING`. |
+**PNG export (same as diagram 1):**  
+![Target architecture — App Service, Azure SQL, Blob](./screenshots/architecture-target.png)
 
-## Optional: where the React app lives
+---
 
-Same patterns as before: Static Web Apps, Storage static site, or same origin — set **CORS** and **`VITE_API_BASE_URL`**.
+## Diagram 2 — This repository (current deployment pattern)
+
+```mermaid
+flowchart TB
+    subgraph Users["Users"]
+        Browser["Web browser\n(React + Vite)"]
+    end
+
+    subgraph Azure["Azure"]
+        AppService["Azure App Service\nNode.js / Express"]
+        SQLite[("SQLite file\n/tmp/library.db")]
+        Blob["Azure Blob Storage\n(optional)"]
+    end
+
+    Browser -->|"HTTPS"| AppService
+    AppService --> SQLite
+    AppService --> Blob
+```
+
+**PNG export (same as diagram 2):**  
+![Current deployment — App Service, SQLite, optional Blob](./screenshots/architecture-current.png)
+
+To align runtime with Diagram 1, replace `server/db.js` with an Azure SQL client and point connection settings at your database — see [`COURSE-SUBMISSION.md`](./COURSE-SUBMISSION.md) section 2.2.
+
+---
+
+## Where the React app runs
+
+Typical patterns: **Azure Static Web Apps**, **Blob static website + CDN**, or any host with **`VITE_API_BASE_URL`** pointing at the App Service API and **CORS** configured (`CORS_ORIGINS`).

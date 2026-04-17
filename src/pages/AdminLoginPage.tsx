@@ -6,8 +6,8 @@ import { Button } from '../components/ui/Button'
 import { useAuth } from '../context/AuthContext'
 import { ApiError } from '../api/client'
 
-export function LoginPage() {
-  const { login, register, logout } = useAuth()
+export function AdminLoginPage() {
+  const { login, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const from = (location.state as { from?: { pathname: string } })?.from
@@ -18,30 +18,22 @@ export function LoginPage() {
     e.preventDefault()
     setError(null)
     const form = e.currentTarget
-    const submitter = (e.nativeEvent as SubmitEvent).submitter as
-      | HTMLButtonElement
-      | null
-    const data =
-      submitter != null
-        ? new FormData(form, submitter)
-        : new FormData(form)
-    const intent = data.get('intent') as string
+    const data = new FormData(form)
     const email = String(data.get('email') || '').trim()
     const password = String(data.get('password') || '')
     if (!email) return
     try {
-      const u =
-        intent === 'register'
-          ? await register(email, password)
-          : await login(email, password)
-      if (u.role === 'admin') {
+      const u = await login(email, password)
+      if (u.role !== 'admin') {
         logout()
         setError(
-          'Staff accounts use the admin sign-in page. Use the link below.',
+          'This portal is for library staff only. Use the reader sign-in for your account.',
         )
         return
       }
-      navigate(from || '/', { replace: true })
+      navigate(from && from.startsWith('/admin') ? from : '/admin', {
+        replace: true,
+      })
     } catch (err) {
       const msg =
         err instanceof ApiError
@@ -67,11 +59,11 @@ export function LoginPage() {
 
           <div className="mx-auto w-full max-w-md">
             <h1 className="text-2xl font-bold text-[var(--color-text)] sm:text-3xl">
-              Sign in to Libra
+              Staff sign in
             </h1>
             <p className="mt-2 text-sm text-[var(--color-muted)]">
-              Browse the catalog, borrow titles, and manage returns from your
-              account.
+              Manage the catalog and library records. Reader accounts cannot
+              use this page.
             </p>
 
             {error ? (
@@ -89,65 +81,51 @@ export function LoginPage() {
             >
               <div>
                 <label
-                  htmlFor="email"
+                  htmlFor="admin-email"
                   className="mb-1.5 block text-sm font-medium text-[var(--color-text)]"
                 >
                   Email
                 </label>
                 <input
-                  id="email"
+                  id="admin-email"
                   name="email"
                   type="email"
-                  autoComplete="email"
+                  autoComplete="username"
                   required
                   className="w-full rounded-2xl border border-slate-200 bg-[var(--color-card)] px-4 py-3 text-sm text-[var(--color-text)] shadow-[var(--shadow-soft)] outline-none ring-[var(--color-primary)]/25 focus:border-[var(--color-primary)] focus:ring-2 dark:border-slate-600"
-                  placeholder="you@example.com"
+                  placeholder="staff@library.org"
                 />
               </div>
               <PasswordField
-                id="password"
+                id="admin-password"
                 label="Password"
                 autoComplete="current-password"
                 required
                 placeholder="••••••••"
               />
 
-              <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
-                <Button
-                  type="submit"
-                  name="intent"
-                  value="login"
-                  variant="primary"
-                  className="flex-1 !py-3"
-                >
-                  Login
-                </Button>
-                <Button
-                  type="submit"
-                  name="intent"
-                  value="register"
-                  variant="secondary"
-                  className="flex-1 !py-3"
-                >
-                  Register
-                </Button>
-              </div>
+              <Button
+                type="submit"
+                variant="primary"
+                className="w-full !py-3"
+              >
+                Staff login
+              </Button>
             </form>
 
-            <p className="mt-8 space-y-3 text-center text-sm">
-              <span className="block">
-                <Link
-                  to="/admin/login"
-                  className="font-medium text-[var(--color-primary)] hover:underline"
-                >
-                  Library staff? Admin sign in
-                </Link>
-              </span>
+            <p className="mt-8 space-y-2 text-center text-sm">
+              <Link
+                to="/login"
+                className="font-medium text-[var(--color-primary)] hover:underline"
+              >
+                Reader sign in
+              </Link>
+              <span className="mx-2 text-[var(--color-muted)]">·</span>
               <Link
                 to="/catalog"
-                className="block font-medium text-[var(--color-muted)] hover:text-[var(--color-text)]"
+                className="font-medium text-[var(--color-muted)] hover:text-[var(--color-text)]"
               >
-                ← Browse catalog
+                Browse catalog
               </Link>
             </p>
           </div>
