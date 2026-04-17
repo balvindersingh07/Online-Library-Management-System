@@ -5,6 +5,9 @@
 #   Name:  AZURE_WEBAPP_PUBLISH_PROFILE  (exact spelling)
 #   Value: full contents of the file from Azure → libra-api → Get publish profile
 #          (SCM Basic Auth must be On in App Service Configuration if download was blocked)
+#
+# If deploy fails with HTTP 403: fix Azure networking + SCM (see docs/AZURE-DEPLOY-403.md).
+# Linux: set app setting WEBSITE_WEBDEPLOY_USE_SCM=true before relying on publish profile.
 
 name: Deploy Python to Azure Web App
 
@@ -12,6 +15,15 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      actions_step_debug:
+        description: 'Verbose runner logs (ACTIONS_STEP_DEBUG)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 permissions:
   contents: read
@@ -19,6 +31,9 @@ permissions:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    env:
+      # workflow_dispatch only; empty on push → false
+      ACTIONS_STEP_DEBUG: ${{ github.event.inputs.actions_step_debug || 'false' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -45,9 +60,21 @@ jobs:
             exit 1
           fi
 
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v2
+      - name: Publish profile diagnostics (no secrets printed)
+        env:
+          PP: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        run: |
+          echo "::group::Publish profile checks"
+          echo "Secret length (characters): ${#PP}"
+          if echo "$PP" | grep -q '<publishData'; then echo "OK: contains <publishData"; else echo "::warning::Missing <publishData> — secret may be truncated"; fi
+          echo "publishMethod attributes found:"
+          echo "$PP" | grep -oE 'publishMethod="[^"]+"' | sort -u || true
+          echo "::endgroup::"
+
+      - name: Deploy to Azure Web App (ZIP)
+        uses: azure/webapps-deploy@v3
         with:
           app-name: 'libra-api'
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: .
+          type: ZIP
