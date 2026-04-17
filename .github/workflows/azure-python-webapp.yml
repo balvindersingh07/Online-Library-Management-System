@@ -71,10 +71,10 @@ jobs:
           echo "$PP" | grep -oE 'publishMethod="[^"]+"' | sort -u || true
           echo "::endgroup::"
 
-      - name: Deploy to Azure Web App (ZIP)
+      # Do not set type: ZIP with package: . — v3 then treats . as a zip file → EISDIR. Folder deploy is default.
+      - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'libra-api'
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: .
-          type: ZIP
