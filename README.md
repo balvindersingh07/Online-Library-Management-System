@@ -10,4 +10,4 @@ npm run dev          # Vite UI (separate terminal)
 npm start            # API
 ```
 
-Set `VITE_API_BASE_URL` for the UI to reach the API. Copy [`.env.example`](./.env.example) for local API env vars.
+Copy [`.env.example`](./.env.example) → **`.env.local`** and set **`VITE_API_BASE_URL`** to your API URL (no trailing slash). Copy → **`.env`** for API secrets when running `npm start` locally.

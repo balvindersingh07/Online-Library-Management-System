@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node server/index.js",
+    "seed": "node server/seed-cli.js",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",

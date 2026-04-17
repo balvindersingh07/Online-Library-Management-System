@@ -13,6 +13,7 @@ import {
 } from './auth.js'
 import { uploadBytes } from './blob.js'
 import { openApiSpec } from './openapi.js'
+import { seedIfEmpty } from './seed.js'
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -21,7 +22,8 @@ const upload = multer({
 
 function corsOrigins() {
   const raw =
-    process.env.CORS_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173'
+    process.env.CORS_ORIGINS ||
+    'http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173'
   return raw
     .split(',')
     .map((s) => s.trim())
@@ -304,6 +306,7 @@ app.post(
 )
 
 getDb()
+seedIfEmpty()
 const port = Number(process.env.PORT || process.env.WEBSITES_PORT || 8000)
 app.listen(port, '0.0.0.0', () => {
   console.log(`[libra-api] listening on 0.0.0.0:${port}`)
