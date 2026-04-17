@@ -1,6 +1,12 @@
 #!/bin/bash
 set -euo pipefail
-# Dependencies should be installed at deploy time (Oryx / GitHub Actions).
-# Avoiding `pip install` here prevents cold-start timeouts on Free (F1) App Service.
+# Oryx installs packages into antenv on the server; system python3 often has no deps.
 cd /home/site/wwwroot/backend
-exec python3 -m uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"
+if [ -x /home/site/wwwroot/antenv/bin/python ]; then
+  PY=/home/site/wwwroot/antenv/bin/python
+elif [ -x /home/site/wwwroot/antenv/bin/python3 ]; then
+  PY=/home/site/wwwroot/antenv/bin/python3
+else
+  PY=python3
+fi
+exec "$PY" -m uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"
