@@ -1,5 +1,10 @@
 # Deploy FastAPI backend to Azure App Service (Linux, Python).
-# Prerequisite: add GitHub secret AZURE_WEBAPP_PUBLISH_PROFILE (download from Azure portal).
+#
+# REQUIRED (one secret on GitHub):
+#   Settings → Secrets and variables → Actions → Repository secrets
+#   Name:  AZURE_WEBAPP_PUBLISH_PROFILE  (exact spelling)
+#   Value: full contents of the file from Azure → libra-api → Get publish profile
+#          (SCM Basic Auth must be On in App Service Configuration if download was blocked)
 
 name: Deploy Python to Azure Web App
 
@@ -28,8 +33,20 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Verify publish profile secret is set
+        env:
+          PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        run: |
+          if [ -z "$PUBLISH_PROFILE" ]; then
+            echo "::error::Missing GitHub secret AZURE_WEBAPP_PUBLISH_PROFILE."
+            echo "Add it: Repo → Settings → Secrets and variables → Actions → New repository secret."
+            echo "Name must be exactly: AZURE_WEBAPP_PUBLISH_PROFILE"
+            echo "Value: entire .PublishSettings XML from Azure (Get publish profile)."
+            exit 1
+          fi
+
       - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v3
+        uses: azure/webapps-deploy@v2
         with:
           app-name: 'libra-api'
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
