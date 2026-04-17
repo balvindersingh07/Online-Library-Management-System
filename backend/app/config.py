@@ -1,6 +1,15 @@
+import os
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _default_database_url() -> str:
+    # App Service Linux: wwwroot can be read-only (e.g. run-from-package). SQLite in /tmp avoids startup crash.
+    if os.environ.get("WEBSITE_INSTANCE_ID"):
+        return "sqlite:////tmp/library.db"
+    return "sqlite:///./library.db"
 
 
 class Settings(BaseSettings):
@@ -18,8 +27,8 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24
 
-    # Database: Azure SQL (mssql+pyodbc) or sqlite for local dev
-    database_url: str = "sqlite:///./library.db"
+    # Database: Azure SQL (mssql+pyodbc) or sqlite for local dev (override with DATABASE_URL)
+    database_url: str = Field(default_factory=_default_database_url)
 
     # CORS — comma-separated origins, e.g. http://localhost:5173,https://yourapp.azurewebsites.net
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
