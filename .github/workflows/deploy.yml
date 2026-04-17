@@ -34,10 +34,21 @@ jobs:
           PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
         run: test -n "$PUBLISH_PROFILE" || (echo "::error::Missing AZURE_WEBAPP_PUBLISH_PROFILE" && exit 1)
 
+      - name: Publish profile must match Web App libra-api-UNIQUE
+        env:
+          PP: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        run: |
+          if ! echo "$PP" | grep -qi 'libra-api-unique'; then
+            echo "::error::Your GitHub secret is from the WRONG app or an old profile."
+            echo "Fix: Azure Portal → Web App **libra-api-UNIQUE** → Get publish profile → copy ALL XML → GitHub → Settings → Secrets → AZURE_WEBAPP_PUBLISH_PROFILE → Update."
+            exit 1
+          fi
+
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: libra-api-UNIQUE
+          resource-group-name: rg-library-app
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: .
           clean: true
