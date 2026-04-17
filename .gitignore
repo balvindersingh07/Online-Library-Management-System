@@ -27,16 +27,14 @@ dist-ssr
 .env
 .env.*
 !.env.example
-backend/.env
-backend/.venv
 .venv/
 venv/
 
-# Python
-__pycache__/
-*.py[cod]
+# API SQLite (local)
+library.db
+library.db-shm
+library.db-wal
 *.sqlite3
-*.db
 
 # OS
 Thumbs.db

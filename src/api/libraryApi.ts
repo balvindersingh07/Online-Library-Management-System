@@ -7,7 +7,7 @@ function toGenre(g: string): Genre {
   return GENRES.includes(g as Genre) ? (g as Genre) : 'Fiction'
 }
 
-/** Raw book from FastAPI */
+/** Raw book from REST API */
 export type ApiBook = {
   id: number
   title: string

@@ -1,6 +1,8 @@
 name: Deploy to Azure Web App
 
-# Publish profile only (no azure/login — avoids "No subscriptions found").
+# Node API + publish profile (no azure/login).
+# Azure Portal: Stack = Node 20 LTS, Startup command = npm start
+
 # app-name matches Azure Web App `libra-api-UNIQUE` (edit if you rename the app).
 
 on:
@@ -21,13 +23,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-node@v4
         with:
-          python-version: '3.11'
-          cache: pip
-          cache-dependency-path: requirements.txt
+          node-version: '20'
+          cache: npm
 
-      - run: pip install -r requirements.txt
+      - run: npm ci
 
       - name: Require publish profile secret
         env:
@@ -39,8 +40,7 @@ jobs:
           PP: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
         run: |
           if ! echo "$PP" | grep -qi 'libra-api-unique'; then
-            echo "::error::Your GitHub secret is from the WRONG app or an old profile."
-            echo "Fix: Azure Portal → Web App **libra-api-UNIQUE** → Get publish profile → copy ALL XML → GitHub → Settings → Secrets → AZURE_WEBAPP_PUBLISH_PROFILE → Update."
+            echo "::error::Publish profile XML must be for app libra-api-UNIQUE (see Azure → Get publish profile)."
             exit 1
           fi
 

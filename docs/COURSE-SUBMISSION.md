@@ -6,38 +6,33 @@ This file fills gaps from the capstone checklist: **setup steps**, **features + 
 
 ## 1. Architecture (deliverable: diagram)
 
-See **Mermaid diagram** in [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md): Browser → **Azure App Service** (FastAPI) → **Azure SQL Database** + **Azure Blob Storage**.
+See **Mermaid diagram** in [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md): Browser → **Azure App Service** (Node / Express) → **SQLite (or Azure SQL)** + **Azure Blob Storage**.
 
 ---
 
 ## 2. Azure setup — steps & configuration
 
-### 2.1 Compute — Azure App Service (Python)
+### 2.1 Compute — Azure App Service (Node.js)
 
 1. Portal → **Create a resource** → **Web App**.
-2. **Runtime stack:** Python **3.13** (match [`azure-python-webapp.yml`](../.github/workflows/azure-python-webapp.yml)).
+2. **Runtime stack:** **Node 20 LTS**.
 3. **Operating system:** Linux.
 4. **Region:** e.g. Central India.
 5. **Pricing plan:** **F1 Free** (dev) or **B1** (low-cost always-on).
-6. After create → **Configuration** → **Stack settings** → **Startup command:**  
-   `bash /home/site/wwwroot/startup.sh`
-7. **Environment variables:** `SCM_DO_BUILD_DURING_DEPLOYMENT` = `true` (or `1`); `JWT_SECRET`; `CORS_ORIGINS`; optional `DATABASE_URL`, `AZURE_STORAGE_CONNECTION_STRING` (see `.env.example`).
-8. **GitHub Actions:** repository secret `AZURE_WEBAPP_PUBLISH_PROFILE`; workflow deploys the repo root (see workflow file).
+6. After create → **Configuration** → **Stack settings** → **Startup command:** `npm start`
+7. **Environment variables:** `SCM_DO_BUILD_DURING_DEPLOYMENT` = `1`; `WEBSITE_WEBDEPLOY_USE_SCM` = `true`; `JWT_SECRET`; `CORS_ORIGINS`; optional `AZURE_STORAGE_CONNECTION_STRING` (see `.env.example`).
+8. **GitHub Actions:** repository secret `AZURE_WEBAPP_PUBLISH_PROFILE`; workflow [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) deploys the repo root.
 
-### 2.2 Database — Azure SQL Database
+### 2.2 Database — SQLite (default) or Azure SQL
 
-1. Portal → **SQL databases** → **Create** (new server + database).
-2. **Compute:** start with **Serverless** or small **DTU** (Basic / S0) for class projects.
-3. **Networking:** allow Azure services; add firewall rule for your IP (dev) and/or App Service outbound (production patterns).
-4. **Backup:** use defaults (**geo-redundant** or **local** per budget); retention per policy.
-5. App configuration: set **`DATABASE_URL`** to a `mssql+pyodbc://...` URL (see `backend/.env.example` and `backend/README.md` Phase 2). On App Service Linux, install **ODBC Driver 18** and use `backend/requirements-sqlserver.txt` where applicable.
+Current API uses **SQLite** (`better-sqlite3`): `/tmp/library.db` on App Service, `./library.db` locally. To use **Azure SQL** later, migrate with a Node SQL client (e.g. `mssql` / Prisma) and replace `server/db.js`.
 
 ### 2.3 Storage — Azure Blob (book covers)
 
 1. Portal → **Storage account** → create (LRS, Hot tier is enough for coursework).
 2. **Containers** → create container (e.g. `book-covers`).
-3. **Access:** use **connection string** in App Service setting `AZURE_STORAGE_CONNECTION_STRING` (server-side only; never commit to git). Optional: SAS URLs for time-limited read if you expose links to clients.
-4. API: admin upload uses `azure-storage-blob` SDK (`backend/app/services/blob_service.py`).
+3. **Access:** use **connection string** in App Service setting `AZURE_STORAGE_CONNECTION_STRING` (server-side only; never commit to git).
+4. API: admin upload uses `@azure/storage-blob` (`server/blob.js`).
 
 ---
 
@@ -87,7 +82,7 @@ FUNCTION returnBook(userId, bookId):
     UPDATE books SET available_copies = available_copies + 1 WHERE id = bookId
 ```
 
-(Real implementation: FastAPI routes + SQLAlchemy — see `backend/app/routes/` and `backend/app/services/`.)
+(Real implementation: Express routes in `server/index.js` + `server/db.js`.)
 
 ---
 
@@ -118,7 +113,7 @@ FUNCTION returnBook(userId, bookId):
 
 ## 7. Performance (simple strategies)
 
-1. **Database:** SQLAlchemy **connection pooling** with `pool_pre_ping` and `pool_recycle` for Azure SQL (see `backend/app/database.py`).
+1. **Database:** SQLite WAL mode; for Azure SQL later add pooling via driver/ORM.
 2. **API / static:** add **HTTP caching headers** or a small **in-memory cache** for hot catalog reads if traffic grows; serve React static build from CDN or **Azure Front Door** for global latency (optional extension).
 3. **Blob:** cache **image URLs** in the database; browser/CDN caching for cover images.
 
@@ -127,6 +122,6 @@ FUNCTION returnBook(userId, bookId):
 ## 8. Completion checklist (for you)
 
 - [ ] Attach **Pricing Calculator** export/screenshot (Section 5).
-- [ ] If rubric requires **Azure SQL in prod**, set `DATABASE_URL` + ODBC on App Service.
+- [ ] If rubric requires **Azure SQL in prod**, migrate from SQLite and configure connection string.
 - [ ] If rubric requires **Blob**, set `AZURE_STORAGE_CONNECTION_STRING` and test admin upload.
-- [ ] Submit **ARCHITECTURE.md** + this file + (optional) `backend/README.md` as technical appendix.
+- [ ] Submit **ARCHITECTURE.md** + this file + (optional) [`server/README.md`](../server/README.md) as technical appendix.

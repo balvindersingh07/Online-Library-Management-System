@@ -1,2 +1,0 @@
-# Bash on Linux App Service must have LF line endings
-startup.sh text eol=lf

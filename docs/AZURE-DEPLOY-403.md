@@ -38,7 +38,7 @@ Docs: [Deploying to network-secured sites](https://aka.ms/gha/deploying-to-netwo
 ## 4) `WEBSITE_RUN_FROM_PACKAGE` (optional)
 
 - **Not required** to fix 403.
-- If set to **`1`**, the site runs from a mounted package (often **read-only** `wwwroot`). This repo uses SQLite under **`/tmp`** on App Service when `WEBSITE_INSTANCE_ID` is set so DB creation still works. Only enable if you understand [run from package](https://learn.microsoft.com/azure/app-service/deploy-run-package).
+- If set to **`1`**, the site runs from a mounted package (often **read-only** `wwwroot`). The Node API uses SQLite under **`/tmp`** when `WEBSITE_INSTANCE_ID` is set. Only enable if you understand [run from package](https://learn.microsoft.com/azure/app-service/deploy-run-package).
 
 ---
 
