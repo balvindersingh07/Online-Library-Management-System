@@ -1,10 +1,20 @@
 #!/bin/bash
-set -euo pipefail
+set -eo pipefail
+export PYTHONUNBUFFERED=1
 cd /home/site/wwwroot/backend
+PORT="${PORT:-8000}"
 if [ -f /home/site/wwwroot/antenv/bin/activate ]; then
   # shellcheck source=/dev/null
   source /home/site/wwwroot/antenv/bin/activate
-  exec python -m uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"
+  PY=python
 else
-  exec python3 -m uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"
+  PY=python3
 fi
+# Azure App Service sets PORT (often 8000 or 8080). Gunicorn + Uvicorn worker is the supported pattern on Linux.
+exec "$PY" -m gunicorn app.main:app \
+  -k uvicorn.workers.UvicornWorker \
+  -w 1 \
+  --bind "0.0.0.0:${PORT}" \
+  --timeout 120 \
+  --access-logfile - \
+  --error-logfile -
