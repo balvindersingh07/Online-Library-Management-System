@@ -1,0 +1,3 @@
+# Optional: only when deploying against Azure SQL / SQL Server with ODBC Driver 18 installed.
+-r requirements.txt
+pyodbc>=5.0.0

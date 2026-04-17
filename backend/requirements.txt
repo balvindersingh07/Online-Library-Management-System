@@ -4,9 +4,11 @@ uvicorn[standard]>=0.30.0
 gunicorn>=23.0.0
 python-multipart>=0.0.9
 
-# Database
+# Database (SQLAlchemy core; SQLite works without ODBC)
 sqlalchemy>=2.0.0
-pyodbc>=5.0.0
+# pyodbc is NOT installed by default — it often breaks `pip install` on App Service Linux.
+# When you use Azure SQL, add ODBC Driver 18 on the host and install: pip install pyodbc
+# Or use: pip install -r requirements-sqlserver.txt (see that file)
 
 # Settings & validation
 pydantic-settings>=2.0.0
