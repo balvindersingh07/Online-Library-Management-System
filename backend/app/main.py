@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 
 from app.config import get_settings
 from app.database import Base, engine
@@ -54,6 +55,11 @@ app.include_router(auth.router)
 app.include_router(books.router)
 app.include_router(borrow.router)
 app.include_router(upload.router)
+
+
+@app.get("/")
+def root() -> RedirectResponse:
+    return RedirectResponse(url="/docs", status_code=307)
 
 
 @app.get("/health")

@@ -1,20 +1,29 @@
 #!/bin/bash
 set -eo pipefail
 export PYTHONUNBUFFERED=1
-cd /home/site/wwwroot/backend
-PORT="${PORT:-8000}"
-if [ -f /home/site/wwwroot/antenv/bin/activate ]; then
+ROOT=/home/site/wwwroot
+cd "$ROOT/backend" || {
+  echo "FATAL: missing $ROOT/backend" >&2
+  ls -la "$ROOT" >&2 || true
+  exit 1
+}
+if [ -f "$ROOT/antenv/bin/activate" ]; then
   # shellcheck source=/dev/null
-  source /home/site/wwwroot/antenv/bin/activate
+  source "$ROOT/antenv/bin/activate"
   PY=python
 else
   PY=python3
+  echo "WARN: antenv missing; using $PY (set SCM_DO_BUILD_DURING_DEPLOYMENT=1)" >&2
 fi
-# Azure App Service sets PORT (often 8000 or 8080). Gunicorn + Uvicorn worker is the supported pattern on Linux.
-exec "$PY" -m gunicorn app.main:app \
-  -k uvicorn.workers.UvicornWorker \
-  -w 1 \
-  --bind "0.0.0.0:${PORT}" \
-  --timeout 120 \
-  --access-logfile - \
-  --error-logfile -
+# Azure sets PORT; some stacks expose WEBSITES_PORT
+if [ -z "${PORT:-}" ] && [ -n "${WEBSITES_PORT:-}" ]; then
+  export PORT="$WEBSITES_PORT"
+fi
+PORT="${PORT:-8000}"
+echo "STARTUP root=$ROOT port=$PORT py=$($PY -V 2>&1) pwd=$(pwd)" >&2
+exec "$PY" -m uvicorn app.main:app \
+  --host 0.0.0.0 \
+  --port "$PORT" \
+  --proxy-headers \
+  --forwarded-allow-ips='*' \
+  --log-level info
