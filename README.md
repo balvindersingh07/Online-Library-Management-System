@@ -114,6 +114,22 @@ npm run dev          # UI — http://localhost:5173
 
 ---
 
+## Deploy frontend (Vercel)
+
+Repo includes [`vercel.json`](./vercel.json) so React Router paths work on refresh. **Commit and push** `vercel.json` (and `scripts/postbuild-spa-fallback.mjs`) — if it is missing from GitHub, `/login` returns **404** on Vercel.
+
+1. [vercel.com](https://vercel.com) → sign in → **Add New…** → **Project** → **Import** this GitHub repo.
+2. **Framework preset:** Vite (auto). **Root directory:** `.` **Build command:** `npm run build` **Output:** `dist` (defaults are usually correct).
+3. **Environment variables** → add **`VITE_API_BASE_URL`** = your live API base URL (no trailing slash), e.g. `https://your-api.azurewebsites.net`.
+4. **Deploy.** Open the `.vercel.app` URL.
+5. On **Azure App Service** (API), set **`CORS_ORIGINS`** to include your Vercel URL (e.g. `https://libra-xxx.vercel.app`) and restart the API.
+
+**If Vercel shows `404: NOT_FOUND` on `/login`:** push latest code (includes `404.html` SPA fallback + `vercel.json`), confirm project **Root Directory** is empty (repo root), open **Deployments → Build log** for errors, then **Redeploy**.
+
+**If `register` preflight is `403`:** on the API app, turn off **Authentication** (Microsoft / “Easy Auth”) unless you need it — it can block `OPTIONS` before Express CORS runs.
+
+---
+
 ## API quick reference
 
 | Endpoint | Purpose |

@@ -24,10 +24,29 @@ function corsOrigins() {
   const raw =
     process.env.CORS_ORIGINS ||
     'http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173'
-  return raw
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean)
+  const seen = new Set()
+  const list = []
+  for (const part of raw.split(',')) {
+    let s = part.trim().replace(/\/+$/, '')
+    if (!s || seen.has(s)) continue
+    seen.add(s)
+    list.push(s)
+  }
+  return list
+}
+
+/** Normalize browser Origin / config URL for comparison (scheme+host lowercase, no trailing slash). */
+function normalizeCorsOrigin(s) {
+  const t = String(s || '')
+    .trim()
+    .replace(/\/+$/, '')
+  if (!t) return ''
+  try {
+    const u = new URL(t)
+    return `${u.protocol}//${u.host}`.toLowerCase()
+  } catch {
+    return t.toLowerCase()
+  }
 }
 
 function requireAuth(req, res, next) {
@@ -70,7 +89,19 @@ function bookRowToOut(row) {
 }
 
 const app = express()
-app.use(cors({ origin: corsOrigins(), credentials: true }))
+const allowedOrigins = corsOrigins().map(normalizeCorsOrigin).filter(Boolean)
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin) return callback(null, true)
+      const n = normalizeCorsOrigin(origin)
+      if (allowedOrigins.includes(n)) return callback(null, true)
+      console.warn('[libra-api] CORS blocked Origin:', origin, 'allowed:', allowedOrigins)
+      return callback(null, false)
+    },
+    credentials: false,
+  }),
+)
 app.use(express.json())
 
 app.get('/', (req, res) => res.redirect(307, '/docs'))
@@ -311,4 +342,5 @@ seedDevAdminIfMissing()
 const port = Number(process.env.PORT || process.env.WEBSITES_PORT || 8000)
 app.listen(port, '0.0.0.0', () => {
   console.log(`[libra-api] listening on 0.0.0.0:${port}`)
+  console.log('[libra-api] CORS allowed origins (normalized):', allowedOrigins)
 })
