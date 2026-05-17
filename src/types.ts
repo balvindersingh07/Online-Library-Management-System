@@ -21,6 +21,22 @@ export type BorrowRecord = {
   dueDate: string
 }
 
+export type AdminBorrowRecord = {
+  id: string
+  dueDate: string
+  returned: boolean
+  user: {
+    id: string
+    email: string
+    role: string
+  }
+  book: {
+    id: string
+    title: string
+    author: string
+  }
+}
+
 export type User = {
   id: string
   name: string

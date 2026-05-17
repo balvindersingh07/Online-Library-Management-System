@@ -1,8 +1,25 @@
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 
+const MIN_JWT_SECRET_LENGTH = 32
+
+export function validateJwtSecretOrThrow() {
+  const secret = String(process.env.JWT_SECRET || '').trim()
+  if (!secret) {
+    throw new Error(
+      '[libra-api] Startup error: JWT_SECRET is required. Set a strong secret in environment variables.',
+    )
+  }
+  if (secret.length < MIN_JWT_SECRET_LENGTH) {
+    throw new Error(
+      `[libra-api] Startup error: JWT_SECRET must be at least ${MIN_JWT_SECRET_LENGTH} characters.`,
+    )
+  }
+  return secret
+}
+
 export function jwtSecret() {
-  return process.env.JWT_SECRET || 'change-me-in-production-use-openssl-rand'
+  return validateJwtSecretOrThrow()
 }
 
 export function hashPassword(plain) {

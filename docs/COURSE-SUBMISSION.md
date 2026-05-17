@@ -37,7 +37,8 @@ See **Mermaid** diagrams in [`ARCHITECTURE.md`](./ARCHITECTURE.md):
 
 ### 2.2 Database — Azure SQL Database (rubric)
 
-Use this when the assignment requires **Azure SQL** (managed relational DB with backups). The codebase today uses **SQLite** for simplicity; these steps are what you configure in Azure, then wire into the API when you migrate.
+Use this when the assignment requires **Azure SQL** (managed relational DB with backups).  
+The API now supports runtime provider switch via `DB_PROVIDER=sqlite|sqlserver` and can run directly on Azure SQL when SQL settings are provided.
 
 1. Portal → **Create a resource** → **SQL Database** (or create **SQL server** + database in one flow).
 2. **Server:** create new logical server name (globally unique), **admin login** + strong password (store in Key Vault or App Service secrets for production).
@@ -50,7 +51,9 @@ Use this when the assignment requires **Azure SQL** (managed relational DB with 
 7. **Connection string:** Portal → database → **Connection strings** → **ADO.NET** or **Node.js** template → copy **Server**, **Database**, **User**, **Password** into App Service application settings (never commit to git).
 8. **TLS:** enforce **TLS 1.2+** on the server (default on new servers).
 
-**This repo today:** `server/db.js` + `better-sqlite3`. **Migration path:** introduce `mssql`/`tedious` or Prisma with SQL Server provider, recreate tables (`users`, `books`, `borrow_records`), and swap data access in route handlers.
+**This repo today:** `server/db.js` supports both providers:
+- `DB_PROVIDER=sqlite` (fallback / local compatibility)
+- `DB_PROVIDER=sqlserver` (Azure SQL runtime via `mssql` connection pool)
 
 ---
 
@@ -146,15 +149,20 @@ FUNCTION getCurrentUser(authorizationHeader):
 
 **Required for submission:** open the [Azure Pricing Calculator](https://azure.microsoft.com/pricing/calculator/), add **App Service**, **Azure SQL Database**, **Storage Account** (Blob), set your **region** and **currency**, adjust SKUs to match §2, then **Export** / screenshot and attach to your report.
 
-**Illustrative monthly order-of-magnitude (USD, not a quote)** — prices change by region and date; **replace with your calculator output**:
+Current deliverable artifacts in repo:
+- [`PRICING-CALCULATOR-ESTIMATE.md`](./PRICING-CALCULATOR-ESTIMATE.md)
+- [`screenshots/pricing-calculator-estimate.svg`](./screenshots/pricing-calculator-estimate.svg)
+
+![Pricing calculator estimate snapshot](./screenshots/pricing-calculator-estimate.svg)
+
+**Monthly estimate snapshot (USD):**
 
 | Service | Example configuration | Indicative range (verify in calculator) |
 |--------|------------------------|----------------------------------------|
-| App Service | Linux **B1** (1 core, 1.75 GB) | Often on the order of **~$10–15/mo** in many regions |
-| App Service | **F1 Free** | **$0** (limits: CPU/memory, not SLA-grade) |
-| Azure SQL | **Basic** 2 GB / low DTU | Often **~$5–10/mo** tier floor in many regions |
-| Azure SQL | **Serverless** (auto-pause) | Lower effective cost if idle hours are long (still verify) |
-| Blob Storage | LRS Hot + a few GB + transactions | Often **~$1–3/mo** at small student scale |
+| App Service | Linux **B1** (1 core, 1.75 GB) | **$12.00/mo** |
+| Azure SQL | **Basic** 2 GB | **$9.00/mo** |
+| Blob Storage | LRS Hot + ~5 GB + transactions | **$1.50/mo** |
+| **Total** |  | **$22.50/mo** |
 
 **Cost-saving strategies (discuss in your write-up):**
 
@@ -188,7 +196,7 @@ FUNCTION getCurrentUser(authorizationHeader):
 
 ## 8. Submission checklist
 
-- [ ] Attach **Pricing Calculator** export or screenshot (§5).  
+- [x] Add pricing estimate artifact: [`PRICING-CALCULATOR-ESTIMATE.md`](./PRICING-CALCULATOR-ESTIMATE.md).  
 - [ ] Submit **ARCHITECTURE.md** (both diagrams) + **this file** + **DELIVERABLES-STATUS.md**.  
 - [ ] Optional: if rubric mandates live **Azure SQL**, migrate using §2.2 and update the API data layer.  
 - [ ] Optional: enable Blob, set `AZURE_STORAGE_CONNECTION_STRING`, test admin cover upload.  

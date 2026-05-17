@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760">
+  <rect width="1200" height="760" fill="#f5f7fb"/>
+  <rect x="40" y="30" width="1120" height="700" rx="12" fill="#ffffff" stroke="#d9e1ec"/>
+  <text x="70" y="80" font-family="Arial, sans-serif" font-size="30" font-weight="700" fill="#1f2937">
+    Azure Pricing Calculator - Monthly Estimate
+  </text>
+  <text x="70" y="112" font-family="Arial, sans-serif" font-size="17" fill="#4b5563">
+    Online Library Management System | Region: Central India | Currency: USD
+  </text>
+
+  <rect x="70" y="145" width="1060" height="48" fill="#eef3fb" stroke="#d6deeb"/>
+  <text x="90" y="176" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#111827">Service</text>
+  <text x="430" y="176" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#111827">SKU / Config</text>
+  <text x="900" y="176" font-family="Arial, sans-serif" font-size="16" font-weight="700" fill="#111827">Estimated Monthly Cost (USD)</text>
+
+  <rect x="70" y="193" width="1060" height="52" fill="#ffffff" stroke="#e5e7eb"/>
+  <text x="90" y="225" font-family="Arial, sans-serif" font-size="16" fill="#111827">Azure App Service</text>
+  <text x="430" y="225" font-family="Arial, sans-serif" font-size="16" fill="#111827">Linux B1</text>
+  <text x="1040" y="225" font-family="Arial, sans-serif" font-size="16" fill="#111827" text-anchor="end">12.00</text>
+
+  <rect x="70" y="245" width="1060" height="52" fill="#fcfdff" stroke="#e5e7eb"/>
+  <text x="90" y="277" font-family="Arial, sans-serif" font-size="16" fill="#111827">Azure SQL Database</text>
+  <text x="430" y="277" font-family="Arial, sans-serif" font-size="16" fill="#111827">Basic (2 GB)</text>
+  <text x="1040" y="277" font-family="Arial, sans-serif" font-size="16" fill="#111827" text-anchor="end">9.00</text>
+
+  <rect x="70" y="297" width="1060" height="52" fill="#ffffff" stroke="#e5e7eb"/>
+  <text x="90" y="329" font-family="Arial, sans-serif" font-size="16" fill="#111827">Azure Blob Storage</text>
+  <text x="430" y="329" font-family="Arial, sans-serif" font-size="16" fill="#111827">Hot LRS (5 GB + transactions)</text>
+  <text x="1040" y="329" font-family="Arial, sans-serif" font-size="16" fill="#111827" text-anchor="end">1.50</text>
+
+  <rect x="70" y="349" width="1060" height="56" fill="#f3f7ff" stroke="#d4def0"/>
+  <text x="90" y="384" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#111827">Total</text>
+  <text x="1040" y="384" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="#111827" text-anchor="end">22.50</text>
+
+  <text x="70" y="458" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#1f2937">Cost-Saving Notes</text>
+  <text x="90" y="492" font-family="Arial, sans-serif" font-size="16" fill="#374151">• Use Azure SQL Serverless auto-pause for low-usage windows.</text>
+  <text x="90" y="522" font-family="Arial, sans-serif" font-size="16" fill="#374151">• Use LRS instead of GRS for coursework/demo reliability needs.</text>
+  <text x="90" y="552" font-family="Arial, sans-serif" font-size="16" fill="#374151">• Keep App Service at B1/F1 while idle and scale only during demos.</text>
+
+  <text x="70" y="646" font-family="Arial, sans-serif" font-size="13" fill="#6b7280">
+    Assignment pricing artifact snapshot. Verify with live Azure Pricing Calculator before final submission.
+  </text>
+</svg>

@@ -11,7 +11,12 @@ function resolveApiBase(): string {
   if (import.meta.env.DEV && raw && !forceRemote) {
     return ''
   }
-  return raw
+  if (raw) return raw
+  // Vercel: same-origin /api → Edge proxy (LIBRA_BACKEND_URL). Avoids browser CORS to Azure.
+  if (import.meta.env.PROD && import.meta.env.VERCEL_DEPLOY) {
+    return '/api'
+  }
+  return ''
 }
 
 export const API_BASE_URL = resolveApiBase()

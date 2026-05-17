@@ -38,6 +38,9 @@ export const openApiSpec = {
     '/borrow/{book_id}': { post: { summary: 'borrow', security: [{ bearerAuth: [] }] } },
     '/return/{book_id}': { post: { summary: 'return', security: [{ bearerAuth: [] }] } },
     '/me/borrows': { get: { summary: 'my borrows', security: [{ bearerAuth: [] }] } },
+    '/admin/borrows': {
+      get: { summary: 'all borrows (admin)', security: [{ bearerAuth: [] }] },
+    },
     '/upload': { post: { summary: 'upload cover (admin)', security: [{ bearerAuth: [] }] } },
   },
   components: {

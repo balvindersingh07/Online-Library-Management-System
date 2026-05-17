@@ -1,8 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '../components/ui/Button'
 import { useLibrary } from '../context/LibraryContext'
 import type { Book, Genre } from '../types'
 import { ApiError } from '../api/client'
+import {
+  fetchAdminBorrowRecords,
+  type AdminBorrowRecord,
+} from '../api/libraryApi'
 
 const genres: Genre[] = [
   'Fiction',
@@ -25,6 +29,47 @@ export function AdminPage() {
   const [editing, setEditing] = useState<Book | null>(null)
   const [form, setForm] = useState<Omit<Book, 'id'>>(emptyForm)
   const [formError, setFormError] = useState<string | null>(null)
+  const [borrowRows, setBorrowRows] = useState<AdminBorrowRecord[]>([])
+  const [borrowLoading, setBorrowLoading] = useState(true)
+  const [borrowError, setBorrowError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setBorrowLoading(true)
+      setBorrowError(null)
+      try {
+        const rows = await fetchAdminBorrowRecords()
+        if (!cancelled) setBorrowRows(rows)
+      } catch (err) {
+        if (cancelled) return
+        const msg =
+          err instanceof ApiError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : 'Failed to load borrow records'
+        setBorrowError(msg)
+      } finally {
+        if (!cancelled) setBorrowLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  function statusLabel(row: AdminBorrowRecord): 'Borrowed' | 'Returned' | 'Overdue' {
+    if (row.returned) return 'Returned'
+    const due = String(row.due_date || '').slice(0, 10)
+    const today = new Date().toISOString().slice(0, 10)
+    return due && due < today ? 'Overdue' : 'Borrowed'
+  }
+
+  function fmtDate(value: string | null): string {
+    if (!value) return '--'
+    return String(value).slice(0, 10)
+  }
 
   function startCreate() {
     setEditing(null)
@@ -144,11 +189,16 @@ export function AdminPage() {
                                 `Delete “${b.title}”? This cannot be undone.`,
                               )
                             ) {
-                              void Promise.resolve(deleteBook(b.id)).catch(
-                                () => {
-                                  /* optional: toast */
-                                },
-                              )
+                              setFormError(null)
+                              void Promise.resolve(deleteBook(b.id)).catch((err) => {
+                                const msg =
+                                  err instanceof ApiError
+                                    ? err.message
+                                    : err instanceof Error
+                                      ? err.message
+                                      : 'Delete failed'
+                                setFormError(msg)
+                              })
                             }
                           }}
                         >
@@ -280,6 +330,96 @@ export function AdminPage() {
               </code>
             </p>
           </div>
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-[20px] border border-slate-200/80 bg-[var(--color-card)] shadow-[var(--shadow-soft)] dark:border-slate-700">
+        <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-700">
+          <h2 className="text-lg font-bold text-[var(--color-text)]">
+            Borrow records
+          </h2>
+          <p className="mt-1 text-sm text-[var(--color-muted)]">
+            View which users borrowed which books.
+          </p>
+        </div>
+        {borrowError ? (
+          <div className="px-4 py-3">
+            <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-950/40 dark:text-red-200">
+              {borrowError}
+            </p>
+          </div>
+        ) : null}
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[820px] text-left text-sm">
+            <thead className="border-b border-slate-200 bg-slate-50/80 dark:border-slate-700 dark:bg-slate-800/50">
+              <tr>
+                <th className="px-4 py-3 font-semibold text-[var(--color-text)]">
+                  User
+                </th>
+                <th className="px-4 py-3 font-semibold text-[var(--color-text)]">
+                  Book
+                </th>
+                <th className="px-4 py-3 font-semibold text-[var(--color-text)]">
+                  Borrowed
+                </th>
+                <th className="px-4 py-3 font-semibold text-[var(--color-text)]">
+                  Due
+                </th>
+                <th className="px-4 py-3 font-semibold text-[var(--color-text)]">
+                  Returned
+                </th>
+                <th className="px-4 py-3 font-semibold text-[var(--color-text)]">
+                  Status
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {borrowLoading ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-6 text-[var(--color-muted)]">
+                    Loading borrow records...
+                  </td>
+                </tr>
+              ) : borrowRows.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-6 text-[var(--color-muted)]">
+                    No borrow records found.
+                  </td>
+                </tr>
+              ) : (
+                borrowRows.map((row) => (
+                  <tr
+                    key={row.borrow_id}
+                    className="border-b border-slate-100 last:border-0 dark:border-slate-800"
+                  >
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-[var(--color-text)]">
+                        {row.user_name}
+                      </div>
+                      <div className="text-xs text-[var(--color-muted)]">
+                        {row.user_email}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-[var(--color-text)]">
+                      {row.book_title}
+                    </td>
+                    <td className="px-4 py-3 text-[var(--color-muted)]">
+                      {fmtDate(row.borrowed_at)}
+                    </td>
+                    <td className="px-4 py-3 text-[var(--color-muted)]">
+                      {fmtDate(row.due_date)}
+                    </td>
+                    <td className="px-4 py-3 text-[var(--color-muted)]">
+                      {fmtDate(row.returned_at)}
+                    </td>
+                    <td className="px-4 py-3 text-[var(--color-text)]">
+                      {statusLabel(row)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

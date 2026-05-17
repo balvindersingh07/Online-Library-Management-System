@@ -1,4 +1,4 @@
-import { apiUrl } from './config'
+import { API_BASE_URL, apiUrl } from './config'
 
 const TOKEN_KEY = 'libra-access-token'
 
@@ -46,7 +46,23 @@ export async function apiFetch<T = unknown>(
     if (t) headers.set('Authorization', `Bearer ${t}`)
   }
 
-  const res = await fetch(apiUrl(path), { ...init, headers })
+  const url = apiUrl(path)
+  let res: Response
+  try {
+    res = await fetch(url, { ...init, headers })
+  } catch (err) {
+    const target = API_BASE_URL ? url : `${window.location.origin}${url}`
+    const hint =
+      'Vercel: set LIBRA_BACKEND_URL (server env) to your HTTPS API base, or set VITE_API_BASE_URL to that URL and fix CORS on Azure. If OPTIONS is 403, turn off App Service Authentication on the API.'
+    const isFetchFailure =
+      err instanceof TypeError ||
+      (err instanceof Error &&
+        /failed to fetch|networkerror|load failed/i.test(err.message))
+    throw new ApiError(
+      isFetchFailure ? `Cannot reach the API (${target}). ${hint}` : String(err),
+      0,
+    )
+  }
 
   if (res.status === 204) {
     return undefined as T
@@ -67,6 +83,20 @@ export async function apiFetch<T = unknown>(
               : String(x),
           )
           .join(', ')
+    }
+    if (
+      (!detail || detail === res.statusText) &&
+      typeof data === 'object' &&
+      data !== null &&
+      'message' in data
+    ) {
+      const m = (data as { message: unknown }).message
+      if (typeof m === 'string' && m.trim()) detail = m
+    }
+    if (!detail || detail === 'Internal Server Error') {
+      if (res.status === 401) detail = 'Authentication required. Please log in again.'
+      else if (res.status === 403) detail = 'You do not have permission to perform this action.'
+      else if (res.status >= 500) detail = 'Server error. Please try again in a moment.'
     }
     throw new ApiError(detail || 'Request failed', res.status, data)
   }

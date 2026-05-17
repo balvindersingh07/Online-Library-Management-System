@@ -116,17 +116,20 @@ npm run dev          # UI — http://localhost:5173
 
 ## Deploy frontend (Vercel)
 
-Repo includes [`vercel.json`](./vercel.json) so React Router paths work on refresh. **Commit and push** `vercel.json` (and `scripts/postbuild-spa-fallback.mjs`) — if it is missing from GitHub, `/login` returns **404** on Vercel.
+Repo includes [`vercel.json`](./vercel.json) so React Router paths work on refresh, and an **Edge proxy** at [`api/proxy.js`](./api/proxy.js) so the browser only talks to your `.vercel.app` origin (no **CORS** configuration required on Azure for normal use).
 
 1. [vercel.com](https://vercel.com) → sign in → **Add New…** → **Project** → **Import** this GitHub repo.
 2. **Framework preset:** Vite (auto). **Root directory:** `.` **Build command:** `npm run build` **Output:** `dist` (defaults are usually correct).
-3. **Environment variables** → add **`VITE_API_BASE_URL`** = your live API base URL (no trailing slash), e.g. `https://your-api.azurewebsites.net`.
-4. **Deploy.** Open the `.vercel.app` URL.
-5. On **Azure App Service** (API), set **`CORS_ORIGINS`** to include your Vercel URL (e.g. `https://libra-xxx.vercel.app`) and restart the API.
+3. **Environment variables** (recommended):
+   - **`LIBRA_BACKEND_URL`** = your API base URL (no trailing slash), e.g. `https://your-api.azurewebsites.net`. This is **server-only** (Vercel Edge); it is not shipped to the browser.
+   - Leave **`VITE_API_BASE_URL` unset** on Vercel so the UI uses same-origin **`/api`** (the proxy). **Redeploy** after adding or changing variables.
+4. **Deploy.** Open the `.vercel.app` URL — staff and reader login should reach Azure without “Failed to fetch” from CORS.
+
+**Optional (direct browser → Azure):** set **`VITE_API_BASE_URL`** to the same HTTPS API URL instead of using the proxy. Then you must allow your Vercel origin on the API (**`CORS_ORIGINS`** or **`CORS_ALLOW_VERCEL=1`**) and ensure **App Service Authentication** is off if `OPTIONS` preflight returns **403**.
 
 **If Vercel shows `404: NOT_FOUND` on `/login`:** push latest code (includes `404.html` SPA fallback + `vercel.json`), confirm project **Root Directory** is empty (repo root), open **Deployments → Build log** for errors, then **Redeploy**.
 
-**If `register` preflight is `403`:** on the API app, turn off **Authentication** (Microsoft / “Easy Auth”) unless you need it — it can block `OPTIONS` before Express CORS runs.
+**If login still fails:** open DevTools → Network → a failing **`/api/...`** request. **503** with a JSON `detail` usually means **`LIBRA_BACKEND_URL` is missing** on Vercel (Production + Preview if you use previews).
 
 ---
 

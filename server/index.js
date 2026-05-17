@@ -3,11 +3,12 @@ import express from 'express'
 import cors from 'cors'
 import multer from 'multer'
 import swaggerUi from 'swagger-ui-express'
-import { getDb } from './db.js'
+import { dbAll, dbGet, dbRun, ensureSchema, withTransaction } from './db.js'
 import {
   createAccessToken,
   decodeTokenSafe,
   hashPassword,
+  validateJwtSecretOrThrow,
   verifyPassword,
   userOut,
 } from './auth.js'
@@ -49,6 +50,18 @@ function normalizeCorsOrigin(s) {
   }
 }
 
+/** https://*.vercel.app — set CORS_ALLOW_VERCEL=1 on the API to allow any Vercel preview/production URL. */
+function isTrustedVercelOrigin(origin) {
+  try {
+    const u = new URL(origin)
+    if (u.protocol !== 'https:') return false
+    const h = u.hostname.toLowerCase()
+    return h === 'vercel.app' || h.endsWith('.vercel.app')
+  } catch {
+    return false
+  }
+}
+
 function requireAuth(req, res, next) {
   const h = req.headers.authorization
   if (!h || !h.toLowerCase().startsWith('bearer ')) {
@@ -62,11 +75,13 @@ function requireAuth(req, res, next) {
   if (Number.isNaN(userId)) {
     return res.status(401).json({ detail: 'Invalid token subject' })
   }
-  const db = getDb()
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId)
-  if (!user) return res.status(401).json({ detail: 'User not found' })
-  req.user = user
-  next()
+  dbGet('SELECT * FROM users WHERE id = ?', [userId])
+    .then((user) => {
+      if (!user) return res.status(401).json({ detail: 'User not found' })
+      req.user = user
+      return next()
+    })
+    .catch((err) => next(err))
 }
 
 function requireAdmin(req, res, next) {
@@ -88,14 +103,25 @@ function bookRowToOut(row) {
   }
 }
 
+function userNameFromEmail(email) {
+  const local = String(email || '').split('@')[0] || 'reader'
+  return local.charAt(0).toUpperCase() + local.slice(1)
+}
+
 const app = express()
 const allowedOrigins = corsOrigins().map(normalizeCorsOrigin).filter(Boolean)
+const allowAnyVercelOrigin =
+  process.env.CORS_ALLOW_VERCEL === '1' ||
+  process.env.CORS_ALLOW_VERCEL === 'true'
 app.use(
   cors({
     origin(origin, callback) {
       if (!origin) return callback(null, true)
       const n = normalizeCorsOrigin(origin)
       if (allowedOrigins.includes(n)) return callback(null, true)
+      if (allowAnyVercelOrigin && isTrustedVercelOrigin(origin)) {
+        return callback(null, true)
+      }
       console.warn('[libra-api] CORS blocked Origin:', origin, 'allowed:', allowedOrigins)
       return callback(null, false)
     },
@@ -111,7 +137,8 @@ app.get('/openapi.json', (req, res) => res.json(openApiSpec))
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }))
 
-app.post('/auth/register', (req, res) => {
+app.post('/auth/register', async (req, res, next) => {
+  try {
   const email = String(req.body?.email || '')
     .toLowerCase()
     .trim()
@@ -122,25 +149,28 @@ app.post('/auth/register', (req, res) => {
   if (password.length < 8 || password.length > 128) {
     return res.status(400).json({ detail: 'Password too short' })
   }
-  const db = getDb()
-  if (db.prepare('SELECT id FROM users WHERE email = ?').get(email)) {
+  if (await dbGet('SELECT id FROM users WHERE email = ?', [email])) {
     return res.status(400).json({ detail: 'Email already registered' })
   }
   const hash = hashPassword(password)
-  const r = db
-    .prepare('INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)')
-    .run(email, hash, 'user')
-  const row = db.prepare('SELECT * FROM users WHERE id = ?').get(r.lastInsertRowid)
+  const r = await dbRun(
+    'INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)',
+    [email, hash, 'user'],
+  )
+  const row = await dbGet('SELECT * FROM users WHERE id = ?', [r.lastInsertRowid])
   res.status(201).json(userOut(row))
+  } catch (err) {
+    next(err)
+  }
 })
 
-app.post('/auth/login', (req, res) => {
+app.post('/auth/login', async (req, res, next) => {
+  try {
   const email = String(req.body?.email || '')
     .toLowerCase()
     .trim()
   const password = String(req.body?.password || '')
-  const db = getDb()
-  const row = db.prepare('SELECT * FROM users WHERE email = ?').get(email)
+  const row = await dbGet('SELECT * FROM users WHERE email = ?', [email])
   if (!row || !verifyPassword(password, row.password_hash)) {
     return res.status(401).json({ detail: 'Incorrect email or password' })
   }
@@ -150,52 +180,63 @@ app.post('/auth/login', (req, res) => {
     token_type: 'bearer',
     user: userOut(row),
   })
+  } catch (err) {
+    next(err)
+  }
 })
 
 app.get('/auth/me', requireAuth, (req, res) => {
   res.json(userOut(req.user))
 })
 
-app.get('/books', (req, res) => {
-  const db = getDb()
-  const rows = db.prepare('SELECT * FROM books ORDER BY id').all()
-  res.json(rows.map(bookRowToOut))
+app.get('/books', async (req, res, next) => {
+  try {
+    const rows = await dbAll('SELECT * FROM books ORDER BY id')
+    res.json(rows.map(bookRowToOut))
+  } catch (err) {
+    next(err)
+  }
 })
 
-app.get('/books/:bookId', (req, res) => {
+app.get('/books/:bookId', async (req, res, next) => {
+  try {
   const id = parseInt(req.params.bookId, 10)
-  const db = getDb()
-  const row = db.prepare('SELECT * FROM books WHERE id = ?').get(id)
+  const row = await dbGet('SELECT * FROM books WHERE id = ?', [id])
   if (!row) return res.status(404).json({ detail: 'Book not found' })
   res.json(bookRowToOut(row))
+  } catch (err) {
+    next(err)
+  }
 })
 
-app.post('/books', requireAuth, requireAdmin, (req, res) => {
+app.post('/books', requireAuth, requireAdmin, async (req, res, next) => {
+  try {
   const b = req.body || {}
   if (!String(b.title || '').trim()) {
     return res.status(422).json({ detail: [{ msg: 'title required' }] })
   }
-  const db = getDb()
-  const r = db
-    .prepare(
-      'INSERT INTO books (title, author, genre, description, available_copies, image_url) VALUES (?,?,?,?,?,?)',
-    )
-    .run(
+  const r = await dbRun(
+    'INSERT INTO books (title, author, genre, description, available_copies, image_url) VALUES (?,?,?,?,?,?)',
+    [
       String(b.title).slice(0, 512),
       String(b.author || '').slice(0, 255),
       String(b.genre || '').slice(0, 128),
       String(b.description ?? ''),
       Math.max(0, Number(b.available_copies ?? 1)),
       b.image_url?.trim() ? String(b.image_url) : null,
-    )
-  const row = db.prepare('SELECT * FROM books WHERE id = ?').get(r.lastInsertRowid)
+    ],
+  )
+  const row = await dbGet('SELECT * FROM books WHERE id = ?', [r.lastInsertRowid])
   res.status(201).json(bookRowToOut(row))
+  } catch (err) {
+    next(err)
+  }
 })
 
-app.put('/books/:bookId', requireAuth, requireAdmin, (req, res) => {
+app.put('/books/:bookId', requireAuth, requireAdmin, async (req, res, next) => {
+  try {
   const id = parseInt(req.params.bookId, 10)
-  const db = getDb()
-  const row = db.prepare('SELECT * FROM books WHERE id = ?').get(id)
+  const row = await dbGet('SELECT * FROM books WHERE id = ?', [id])
   if (!row) return res.status(404).json({ detail: 'Book not found' })
   const b = req.body || {}
   const title = b.title !== undefined ? String(b.title).slice(0, 512) : row.title
@@ -209,92 +250,154 @@ app.put('/books/:bookId', requireAuth, requireAdmin, (req, res) => {
       : row.available_copies
   const image_url =
     b.image_url !== undefined ? (b.image_url?.trim() ? String(b.image_url) : null) : row.image_url
-  db.prepare(
+  await dbRun(
     'UPDATE books SET title=?, author=?, genre=?, description=?, available_copies=?, image_url=? WHERE id=?',
-  ).run(title, author, genre, description, ac, image_url, id)
-  const updated = db.prepare('SELECT * FROM books WHERE id = ?').get(id)
+    [title, author, genre, description, ac, image_url, id],
+  )
+  const updated = await dbGet('SELECT * FROM books WHERE id = ?', [id])
   res.json(bookRowToOut(updated))
+  } catch (err) {
+    next(err)
+  }
 })
 
-app.delete('/books/:bookId', requireAuth, requireAdmin, (req, res) => {
+app.delete('/books/:bookId', requireAuth, requireAdmin, async (req, res, next) => {
+  try {
   const id = parseInt(req.params.bookId, 10)
-  const db = getDb()
-  const row = db.prepare('SELECT * FROM books WHERE id = ?').get(id)
+  const row = await dbGet('SELECT * FROM books WHERE id = ?', [id])
   if (!row) return res.status(404).json({ detail: 'Book not found' })
-  db.prepare('DELETE FROM books WHERE id = ?').run(id)
+  await dbRun('DELETE FROM books WHERE id = ?', [id])
   res.status(204).send()
+  } catch (err) {
+    next(err)
+  }
 })
 
-app.post('/borrow/:bookId', requireAuth, (req, res) => {
-  const bookId = parseInt(req.params.bookId, 10)
-  const userId = req.user.id
-  const db = getDb()
-  const book = db.prepare('SELECT * FROM books WHERE id = ?').get(bookId)
-  if (!book) return res.status(404).json({ detail: 'Book not found' })
-  if (book.available_copies <= 0) {
-    return res.status(400).json({ detail: 'No copies available' })
+app.post('/borrow/:bookId', requireAuth, async (req, res, next) => {
+  try {
+    const bookId = parseInt(req.params.bookId, 10)
+    const userId = req.user.id
+    const due = new Date(Date.now() + 14 * 864e5).toISOString()
+
+    let payload
+    await withTransaction(async (tx) => {
+      const book = await tx.get('SELECT * FROM books WHERE id = ?', [bookId])
+      if (!book) {
+        const e = new Error('Book not found')
+        e.status = 404
+        throw e
+      }
+      if (book.available_copies <= 0) {
+        const e = new Error('No copies available')
+        e.status = 400
+        throw e
+      }
+
+      const dup = await tx.get(
+        'SELECT * FROM borrow_records WHERE user_id=? AND book_id=? AND returned=0',
+        [userId, bookId],
+      )
+      if (dup) {
+        const e = new Error('You already have this book borrowed')
+        e.status = 400
+        throw e
+      }
+
+      const dec = await tx.run(
+        'UPDATE books SET available_copies = available_copies - 1 WHERE id = ? AND available_copies > 0',
+        [bookId],
+      )
+      if (!dec.changes) {
+        const e = new Error('No copies available')
+        e.status = 400
+        throw e
+      }
+
+      const ins = await tx.run(
+        'INSERT INTO borrow_records (user_id, book_id, due_date, returned) VALUES (?,?,?,0)',
+        [userId, bookId, due],
+      )
+      const rec = await tx.get('SELECT * FROM borrow_records WHERE id = ?', [
+        ins.lastInsertRowid,
+      ])
+      payload = {
+        id: rec.id,
+        book_id: rec.book_id,
+        due_date: rec.due_date,
+        returned: Boolean(rec.returned),
+      }
+    })
+
+    res.json(payload)
+  } catch (err) {
+    if (err?.status === 404) {
+      return res.status(404).json({ detail: String(err.message || 'Book not found') })
+    }
+    if (err?.status === 400) {
+      return res.status(400).json({ detail: String(err.message || 'Request failed') })
+    }
+    const msg = String(err?.message || '')
+    if (
+      err?.code === 'SQLITE_CONSTRAINT' ||
+      err?.number === 2601 ||
+      err?.number === 2627 ||
+      msg.includes('idx_borrow_active_unique')
+    ) {
+      return res.status(400).json({ detail: 'You already have this book borrowed' })
+    }
+    next(err)
   }
-  const dup = db
-    .prepare(
-      'SELECT * FROM borrow_records WHERE user_id=? AND book_id=? AND returned=0',
-    )
-    .get(userId, bookId)
-  if (dup) {
-    return res.status(400).json({ detail: 'You already have this book borrowed' })
-  }
-  const due = new Date(Date.now() + 14 * 864e5).toISOString()
-  db.prepare('UPDATE books SET available_copies = available_copies - 1 WHERE id = ?').run(
-    bookId,
-  )
-  const ins = db
-    .prepare(
-      'INSERT INTO borrow_records (user_id, book_id, due_date, returned) VALUES (?,?,?,0)',
-    )
-    .run(userId, bookId, due)
-  const rec = db.prepare('SELECT * FROM borrow_records WHERE id = ?').get(ins.lastInsertRowid)
-  res.json({
-    id: rec.id,
-    book_id: rec.book_id,
-    due_date: rec.due_date,
-    returned: Boolean(rec.returned),
-  })
 })
 
-app.post('/return/:bookId', requireAuth, (req, res) => {
-  const bookId = parseInt(req.params.bookId, 10)
-  const userId = req.user.id
-  const db = getDb()
-  const rec = db
-    .prepare(
-      'SELECT * FROM borrow_records WHERE user_id=? AND book_id=? AND returned=0',
-    )
-    .get(userId, bookId)
-  if (!rec) {
-    return res.status(400).json({ detail: 'No active loan for this book' })
+app.post('/return/:bookId', requireAuth, async (req, res, next) => {
+  try {
+    const bookId = parseInt(req.params.bookId, 10)
+    const userId = req.user.id
+
+    let payload
+    await withTransaction(async (tx) => {
+      const rec = await tx.get(
+        'SELECT * FROM borrow_records WHERE user_id=? AND book_id=? AND returned=0',
+        [userId, bookId],
+      )
+      if (!rec) {
+        const e = new Error('No active loan for this book')
+        e.status = 400
+        throw e
+      }
+
+      await tx.run('UPDATE borrow_records SET returned = 1 WHERE id = ?', [rec.id])
+      await tx.run('UPDATE books SET available_copies = available_copies + 1 WHERE id = ?', [
+        bookId,
+      ])
+
+      const updated = await tx.get('SELECT * FROM borrow_records WHERE id = ?', [rec.id])
+      payload = {
+        id: updated.id,
+        book_id: updated.book_id,
+        due_date: updated.due_date,
+        returned: Boolean(updated.returned),
+      }
+    })
+
+    res.json(payload)
+  } catch (err) {
+    if (err?.status === 400) {
+      return res.status(400).json({ detail: String(err.message || 'Request failed') })
+    }
+    next(err)
   }
-  db.prepare('UPDATE books SET available_copies = available_copies + 1 WHERE id = ?').run(
-    bookId,
-  )
-  db.prepare('UPDATE borrow_records SET returned = 1 WHERE id = ?').run(rec.id)
-  const updated = db.prepare('SELECT * FROM borrow_records WHERE id = ?').get(rec.id)
-  res.json({
-    id: updated.id,
-    book_id: updated.book_id,
-    due_date: updated.due_date,
-    returned: Boolean(updated.returned),
-  })
 })
 
-app.get('/me/borrows', requireAuth, (req, res) => {
-  const db = getDb()
-  const rows = db
-    .prepare(
+app.get('/me/borrows', requireAuth, async (req, res, next) => {
+  try {
+    const rows = await dbAll(
       `SELECT br.id as rid, br.due_date, br.returned,
               b.id as bid, b.title, b.author, b.genre, b.description, b.available_copies, b.image_url
        FROM borrow_records br JOIN books b ON b.id = br.book_id
        WHERE br.user_id = ? AND br.returned = 0 ORDER BY br.due_date`,
+      [req.user.id],
     )
-    .all(req.user.id)
   const out = rows.map((r) => ({
     id: r.rid,
     due_date: r.due_date,
@@ -310,6 +413,46 @@ app.get('/me/borrows', requireAuth, (req, res) => {
     },
   }))
   res.json(out)
+  } catch (err) {
+    next(err)
+  }
+})
+
+app.get('/admin/borrow-records', requireAuth, requireAdmin, async (req, res, next) => {
+  try {
+    const rows = await dbAll(
+      `SELECT br.id AS borrow_id,
+              br.user_id AS user_id,
+              u.email AS user_email,
+              br.book_id AS book_id,
+              b.title AS book_title,
+              NULL AS borrowed_at,
+              br.due_date AS due_date,
+              br.returned AS returned,
+              NULL AS returned_at
+       FROM borrow_records br
+       JOIN users u ON u.id = br.user_id
+       JOIN books b ON b.id = br.book_id
+       ORDER BY br.returned ASC, br.due_date ASC, br.id DESC`,
+    )
+
+    res.json(
+      rows.map((r) => ({
+        borrow_id: r.borrow_id,
+        user_id: r.user_id,
+        user_name: userNameFromEmail(r.user_email),
+        user_email: r.user_email,
+        book_id: r.book_id,
+        book_title: r.book_title,
+        borrowed_at: r.borrowed_at ?? null,
+        due_date: r.due_date,
+        returned: Boolean(r.returned),
+        returned_at: r.returned_at ?? null,
+      })),
+    )
+  } catch (err) {
+    next(err)
+  }
 })
 
 app.post(
@@ -336,11 +479,22 @@ app.post(
   },
 )
 
-getDb()
-seedIfEmpty()
-seedDevAdminIfMissing()
-const port = Number(process.env.PORT || process.env.WEBSITES_PORT || 8000)
-app.listen(port, '0.0.0.0', () => {
-  console.log(`[libra-api] listening on 0.0.0.0:${port}`)
-  console.log('[libra-api] CORS allowed origins (normalized):', allowedOrigins)
+validateJwtSecretOrThrow()
+async function start() {
+  await ensureSchema()
+  await seedIfEmpty()
+  await seedDevAdminIfMissing()
+  const port = Number(process.env.PORT || process.env.WEBSITES_PORT || 8000)
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`[libra-api] listening on 0.0.0.0:${port}`)
+    console.log('[libra-api] CORS allowed origins (normalized):', allowedOrigins)
+    if (allowAnyVercelOrigin) {
+      console.log('[libra-api] CORS: any https://*.vercel.app origin allowed (CORS_ALLOW_VERCEL)')
+    }
+  })
+}
+
+start().catch((err) => {
+  console.error(err)
+  process.exit(1)
 })

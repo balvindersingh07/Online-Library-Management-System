@@ -25,6 +25,19 @@ export type ApiActiveBorrow = {
   book: ApiBook
 }
 
+export type AdminBorrowRecord = {
+  borrow_id: number
+  user_id: number
+  user_name: string
+  user_email: string
+  book_id: number
+  book_title: string
+  borrowed_at: string | null
+  due_date: string
+  returned: boolean
+  returned_at: string | null
+}
+
 export function mapApiBookToBook(b: ApiBook): Book {
   return {
     id: String(b.id),
@@ -51,6 +64,10 @@ export async function fetchMyBorrows(): Promise<
     bookId: String(r.book.id),
     dueDate: r.due_date.slice(0, 10),
   }))
+}
+
+export async function fetchAdminBorrowRecords(): Promise<AdminBorrowRecord[]> {
+  return apiFetch<AdminBorrowRecord[]>('/admin/borrow-records')
 }
 
 export async function borrowBookApi(bookId: string): Promise<void> {
